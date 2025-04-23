@@ -7,7 +7,9 @@ from chromadb.utils import embedding_functions
 import docx
 import pandas as pd
 import logging
+import streamlit as st
 
+api_key = st.secrets.get("open-key")
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,12 +23,6 @@ except Exception as e:
     logger.error(f"Failed to load secrets.toml: {str(e)}")
     raise
 
-# Validate API key format
-api_key = secrets.get("open-key")
-if not api_key or not api_key.startswith("sk-") or len(api_key) != 51:
-    logger.error("Invalid OpenAI API key format. Key must start with 'sk-' and be 51 characters long.")
-    raise ValueError("Invalid OpenAI API key format")
-
 # Initialize ChromaDB client
 try:
     chroma_client = chromadb.PersistentClient(path="/workspaces/AI-Chatbot/chroma_db")
@@ -37,7 +33,7 @@ except Exception as e:
 # Setup OpenAI embedding function
 try:
     embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-        api_key=api_key,
+        api_key= api_key,
         model_name="text-embedding-ada-002"
     )
 except Exception as e:
@@ -103,7 +99,7 @@ if living_expenses_collection.count() == 0:
             f"Utilities: {row['Utilities']}\n"
             f"Transportation: {row['Transportation']}\n"
             f"Health: {row['Health']}\n"
-            f"Miscellaneous: {row['Misc.']}"
+            f"Miscellaneous: {row['Misc']}"
         )
         living_expenses_collection.add(
             documents=[content],
@@ -144,7 +140,7 @@ if employment_collection.count() == 0:
                 "occupation": row["Occupation Title"],
                 "occupation_code": row["Occupation Code"],
                 "type": "employment",
-                "median_wage": float(row["Median Annual Wage 2023"]),
+                "median_wage": str(row["Median Annual Wage 2023"]),
                 "growth_rate": float(row["Employment Percent Change, 2023-2033"]),
                 "education": row["Typical Entry-Level Education"],
                 "work_experience": row["Work Experience in a Related Occupation"],
