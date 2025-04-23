@@ -1,7 +1,4 @@
 import os
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import chromadb
 from chromadb.utils import embedding_functions
 import docx
@@ -9,31 +6,33 @@ import pandas as pd
 import logging
 import streamlit as st
 
-api_key = st.secrets.get("open-key")
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Read API key from secrets.toml
-import toml
-secrets_path = "/workspaces/AI-Chatbot/.streamlit/secrets.toml"
+# Read API key from Streamlit secrets
 try:
-    secrets = toml.load(secrets_path)
-except Exception as e:
-    logger.error(f"Failed to load secrets.toml: {str(e)}")
+    api_key = st.secrets["open-key"]
+except KeyError:
+    logger.error("OpenAI API key not found in Streamlit secrets. Please add 'open-key' to your Streamlit Cloud secrets.")
     raise
+
+# Validate API key format
+if not api_key or not api_key.startswith("sk-") or len(api_key) != 51:
+    logger.error("Invalid OpenAI API key format. Key must start with 'sk-' and be 51 characters long.")
+    raise ValueError("Invalid OpenAI API key format")
 
 # Initialize ChromaDB client
 try:
-    chroma_client = chromadb.PersistentClient(path="/workspaces/AI-Chatbot/chroma_db")
+    chroma_client = chromadb.PersistentClient(path="chroma_db")
 except Exception as e:
     logger.error(f"Failed to initialize ChromaDB client: {str(e)}")
     raise
 
-# Setup OpenAI embedding function
+# Setup OpenAI embedding function (updated for openai>=1.0.0)
 try:
     embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-        api_key= api_key,
+        api_key=api_key,
         model_name="text-embedding-ada-002"
     )
 except Exception as e:
@@ -66,7 +65,7 @@ def load_word_document(file_path: str) -> str:
 # Load and populate data
 if university_collection.count() == 0:
     logger.info("Loading university data...")
-    university_text = load_word_document("/workspaces/AI-Chatbot/Dataset/University_Data.docx")
+    university_text = load_word_document("Dataset/University_Data.docx")
     if not university_text:
         logger.warning("No university data loaded; skipping university collection.")
     else:
@@ -86,7 +85,9 @@ if university_collection.count() == 0:
 if living_expenses_collection.count() == 0:
     logger.info("Loading living expenses data...")
     try:
-        living_expenses_df = pd.read_csv("/workspaces/AI-Chatbot/Dataset/Avg_Living_Expenses.csv")
+        living_expenses_df = pd.read_csv("Dataset/Avg_Living_Expenses.csv", encoding='utf-8-sig')
+        living_expenses_df.columns = living_expenses_df.columns.str.strip()
+        logger.info(f"Columns in Avg_Living_Expenses.csv: {list(living_expenses_df.columns)}")
     except Exception as e:
         logger.error(f"Failed to load Avg_Living_Expenses.csv: {str(e)}")
         raise
@@ -116,7 +117,8 @@ if living_expenses_collection.count() == 0:
 if employment_collection.count() == 0:
     logger.info("Loading employment projections data...")
     try:
-        employment_df = pd.read_csv("/workspaces/AI-Chatbot/Dataset/Employment_Projections.csv")
+        employment_df = pd.read_csv("Dataset/Employment_Projections.csv")
+        logger.info(f"Columns in Employment_Projections.csv: {list(employment_df.columns)}")
     except Exception as e:
         logger.error(f"Failed to load Employment_Projections.csv: {str(e)}")
         raise
@@ -140,7 +142,7 @@ if employment_collection.count() == 0:
                 "occupation": row["Occupation Title"],
                 "occupation_code": row["Occupation Code"],
                 "type": "employment",
-                "median_wage": str(row["Median Annual Wage 2023"]),
+                "median_wage": float(row["Median Annual Wage 2023"]),
                 "growth_rate": float(row["Employment Percent Change, 2023-2033"]),
                 "education": row["Typical Entry-Level Education"],
                 "work_experience": row["Work Experience in a Related Occupation"],
